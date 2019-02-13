@@ -1,0 +1,51 @@
+ Alabama ËõÐ´£ºAL 
+ Alaska ËõÐ´£ºAK 
+ Arizona ËõÐ´£ºAZ 
+ Arkansas ËõÐ´£ºAR 
+ California ËõÐ´£ºCA 
+ Colorado ËõÐ´£ºCO 
+Columbia ËõÐ´£ºDC 
+ Connecticut ËõÐ´£ºCT 
+ Delaware ËõÐ´£ºDE 
+ Florida ËõÐ´£ºFL 
+ Georgia ËõÐ´£ºGA 
+ Hawaii ËõÐ´£ºHI 
+ Idaho ËõÐ´£ºID 
+ Illinois ËõÐ´£ºIL 
+ Indiana ËõÐ´£ºIN 
+ Iowa ËõÐ´£ºIA 
+ Kansas ËõÐ´£ºKS 
+ Kentucky ËõÐ´£ºKY 
+ Louisiana ËõÐ´£ºLA 
+ Maine ËõÐ´£ºME 
+ Maryland ËõÐ´£ºMD 
+ Massachusetts ËõÐ´£ºMA 
+ Michigan ËõÐ´£ºMI 
+ Minnesota ËõÐ´£ºMN 
+ Mississippi ËõÐ´£ºMS 
+ Missouri ËõÐ´£ºMO 
+ Montana ËõÐ´£ºMT 
+ Nebraska ËõÐ´£ºNE 
+ Nevada ËõÐ´£ºNV 
+ New Hampshire ËõÐ´£ºNH 
+ New Jersey ËõÐ´£ºNJ 
+ New Mexico ËõÐ´£ºNM 
+ New York ËõÐ´£ºNY 
+ North Carolina ËõÐ´£ºNC 
+ North Dakota ËõÐ´£ºND 
+ Ohio ËõÐ´£ºOH 
+ Oklahoma ËõÐ´£ºOK 
+ Oregon ËõÐ´£ºOR 
+ Pennsyivania ËõÐ´£ºPA 
+ Rhode Island ËõÐ´£ºRI 
+ South Carolina ËõÐ´£ºSC 
+ South Dakota ËõÐ´£ºSD 
+ Tennessee ËõÐ´£ºTN 
+ Texas ËõÐ´£ºTX 
+ Utah ËõÐ´£ºUT 
+ Vermont ËõÐ´£ºVT 
+ Virgina ËõÐ´£ºVA 
+ Washington ËõÐ´£ºWA 
+ West Virginia ËõÐ´£ºWV 
+ Wisconsin ËõÐ´£ºWI 
+ Wyoming ËõÐ´£ºWY 
