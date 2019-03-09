@@ -33,14 +33,7 @@ def deal_with_catogory(data):
 	print(num2Cat)
 	return data
 
-# def DTclassifier(data)
-
-if __name__ == '__main__':
-	# l = ['0.58', '0.61', '0.47', '0.13', '0.5', '0.0', '0.48', '0.22']
-	# l_t = list(map(float, l))
-	# print(l_t)
-	# afd
-	fname = 'yeast/yeast.txt'
+def singleDataTest(fname):
 	data = read_from_txt(fname).loc[:, 1:]
 	data = deal_with_catogory(data)
 
@@ -53,4 +46,46 @@ if __name__ == '__main__':
 	y_pred = model.predict(X_test)
 	accuracy = len(np.where(y_test == y_pred)[0])/len(y_test)
 	print(accuracy)
+
+def TranATest(trainFname, testFname):
+	train_data = pd.read_csv(trainFname, header = 0, index_col = 0)
+	test_data = pd.read_csv(testFname, header = 0, index_col = 0)
+
+	num = preprocessing.LabelEncoder()
+	for x in train_data.columns:
+		if train_data[x].dtype != 'float' and train_data[x].dtype != 'int64':
+			train_data[x] = num.fit_transform(train_data[x])
+			test_data[x] = num.fit_transform(test_data[x])
+
+	X_train = train_data.iloc[:, :-1]
+	y_train = train_data.iloc[:, -1]
+	X_test = test_data.iloc[:, :-1]
+	y_test = test_data.iloc[:, -1]
+	model = DecisionTreeClassifier(criterion='entropy')
+	model.fit(X_train, y_train)
+	y_pred = model.predict(X_test)
+	accuracy = len(np.where(y_test == y_pred)[0])/len(y_test)
+	print(accuracy)
+
+
+
+# def DTclassifier(data)
+
+if __name__ == '__main__':
+
+	# fname = 'yeast/yeast.txt'
+	# singleDataTest(fname)
+
+	# folder = 'adult'
+	folder = 'iris'
+	# folder = 'shuttle'
+	# folder = 'wine'
+	percent = 0.5
+	F = folder + '/' + str(percent) + '/'
+	# fname = 'nomissing.csv'
+	fname = 'recover_data.csv'
+	fname1 = 'test.csv'
+	TranATest(F + fname, F + fname1)
+
+
 

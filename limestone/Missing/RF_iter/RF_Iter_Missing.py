@@ -9,6 +9,7 @@ from sklearn.tree import DecisionTreeClassifier
 import operator
 from sklearn.ensemble import IsolationForest
 from BitVector import BitVector
+import copy
 
 
 class RF_Iter_Missing(object):
@@ -66,7 +67,7 @@ class RF_Iter_Missing(object):
 		return data, predict_y
 		# get the precision, recall and f1-measure of the result
 
-	def RF_Missing_Iterative(self, D, t_D):
+	def RF_Missing_Iterative(self, D, t_D, model, predict_type = 0):
 		""" The method used in the a Iterative process for missing and outlier detection
 		and fix. 
 
@@ -105,20 +106,15 @@ class RF_Iter_Missing(object):
 		# print(missing_lines)
 
 		column_type = {x:data[x].dtype for x in data.columns}
-		num2Cat = {}
 		# fill all the missing data with mean
-		data = self.fill_missing(data, not_missing_lines)
+		data, fill_data = self.fill_missing(data, not_missing_lines, predict_type)
 		# transform all the category attribute to numeric ones
-		num = preprocessing.LabelEncoder()
-		fill_data = {}
-		for x in data.columns:
-			if data[x].dtype != 'float':
-				data[x] = num.fit_transform(data[x])
-				t_D[x] = num.fit_transform(t_D[x])
-				num2Cat[x] = {i:num.classes_[i] for i in range(len(num.classes_))}
-				fill_data[x] = data.loc[not_missing_lines[x], x].mode()[0]
-			else:
-				fill_data[x] = data.loc[not_missing_lines[x], x].mean()
+		data, t_D, num2Cat = self.category2num(data, t_D)
+
+		for k, v in num2Cat.items():
+			# fill_data[k]= dict(zip(v.values(),v.keys()))[fill_data[k]]
+			fill_data[k] = v.transform([fill_data[k]])[0]
+
 		# get test_data and split it into features and label
 		X_test = t_D.drop(t_D.columns[-1], axis = 1)
 		y_test = t_D.loc[:, t_D.columns[-1]]
@@ -126,17 +122,17 @@ class RF_Iter_Missing(object):
 		accuracy = self.evaluate(model, data, X_test, y_test)
 		print('origional precision {}'.format(accuracy))
 
-		# train for the outlier dection model
-		complete_data = data[outlier_features].iloc[complete_row_idx, :]
-		ilf = IsolationForest(n_estimators=min(100, len(complete_data)), n_jobs=-1, verbose=2)
-		ilf.fit(complete_data)
-		pred = ilf.predict(complete_data)
-		outlier_idx = [complete_row_idx[i] for i in np.where(pred == -1)[0]]
-		# put these outlier data into the missing list
-		for k, v in missing_lines.items():
-			missing_lines[k] = np.append(v, outlier_idx)
+		if predict_type == 1:
+			column_type[data.columns[-1]] = 'int'
 
+		# train for the outlier dection model
+		# ilf, missing_lines = self.training_oulier_localdata(data, outlier_features, complete_row_idx, missing_lines)
+		# ilf = self.training_oulier_testdata(t_D, outlier_features)
+		ilf, missing_lines = self.training_oulier_alldata(data, t_D, outlier_features, complete_row_idx, missing_lines)
+		p = [0] * 3
 		count = 0
+		best_fit = []
+		best_precision = 0
 		while True:
 			pre_predict = []
 			for x in missing_count:
@@ -146,20 +142,32 @@ class RF_Iter_Missing(object):
 				data, prediction = self.RF(data, x, missing_lines[x], column_type[x])
 				post_predict.extend(prediction)
 			count += 1
-			if count % 5 == 0:
+			if count % 3 == 0:
 				data = self.outlier_fix(data, ilf, outlier_features, missing_lines, fill_data)
 			accuracy = self.evaluate(model, data, X_test, y_test)
-			print(accuracy)
+			# save the best fit result
+			if accuracy > best_precision:
+				print('update')
+				best_fit = post_predict
+				best_precision = accuracy
+			p[(count-1)%3] = accuracy
+			print('Iteration {}, precision is {}'.format(count, accuracy))
 			# stop = operator.eq(post_predict, pre_predict) # too strict
 			loss = sum(abs(np.array(post_predict) - np.array(pre_predict)))/len(pre_predict) if len(pre_predict) != 0 else 10
 			print('current matrix change is {}'.format(loss))
 			# loop stop condition
-			if count > 30 or accuracy > self.precision or loss < 0.0001:
+			if count > 30 or accuracy > self.precision or loss < 0.00001:
 				break
+			if p[0] == p[1] and p[1] == p[2]:
+				break
+		# recover the data with the best fit
+		temp_count = 0
+		for x in missing_count:
+			data.loc[missing_lines[x], x] = best_fit[temp_count:temp_count+len(missing_lines[x])]
+			temp_count += len(missing_lines[x])
 		# recover all numeric attributes to category attributes
-		for x in data.columns:
-			if data[x].dtype != 'float':
-				data[x] = data[x].map(lambda t: num2Cat[x][t])
+		for k, v in num2Cat.items():
+			data[k] = v.inverse_transform(data[k])
 		return data
 
 	def evaluate(self, model, data, X_test, y_test):
@@ -175,7 +183,7 @@ class RF_Iter_Missing(object):
 
 		Returns
 		-------
-		accuracy: float, predict acuracy
+		accuracy: float, predict accuracy
 		"""
 		X_train = data.drop(data.columns[-1], axis = 1)
 		y_train = data.loc[:, data.columns[-1]]
@@ -184,7 +192,7 @@ class RF_Iter_Missing(object):
 		accuracy = len(np.where(y_test == y_predict)[0])/len(y_test)
 		return accuracy
 
-	def fill_missing(self, data, not_missing_lines):
+	def fill_missing(self, data, not_missing_lines, predict_type):
 		""" fill all the missing data with mean or mode data, the global data are
 		collected from the tuple-complete ones
 
@@ -198,14 +206,17 @@ class RF_Iter_Missing(object):
 		-------
 		data: DataFrame, data that has been cleaned without missing items
 		"""
+		fill_data = {}
 		for x in data.columns:
 			if data[x].dtype == 'float':
-				x_mean = data.loc[not_missing_lines[x], x].mean()
-				data[x].fillna(x_mean, inplace=True)
+				if x == data.columns[-1] and predict_type == 1:
+					fill_data[x] = data.loc[not_missing_lines[x], x].mode()[0]
+				else:
+					fill_data[x] = data.loc[not_missing_lines[x], x].mean()
 			else:
-				x_mode = data.loc[not_missing_lines[x], x].mode()
-				data[x].fillna(x_mode[0], inplace=True)
-		return data
+				fill_data[x] = data.loc[not_missing_lines[x], x].mode()[0]
+			data[x].fillna(fill_data[x], inplace=True)
+		return data, fill_data
 
 	def outlier_fix(self, data, ilf, outlier_features, missing_lines, fill_data):
 		""" detect the outlier data and fills it with either mode and mean of the global data
@@ -229,7 +240,8 @@ class RF_Iter_Missing(object):
 		for k, v in missing_lines.items():
 			bitarray.reset(val = 0)
 			for i in v:
-				bitarray[i] = 1
+				# then the i is too large it will converet to float
+				bitarray[int(i)] = 1
 			for j in outlier_idx:
 				if bitarray[j] == 1:
 					data.at[j, k] = fill_data[k]
@@ -240,26 +252,89 @@ class RF_Iter_Missing(object):
 	def tuning(self):
 		pass
 
+	def training_oulier_localdata(self, data, outlier_features, complete_row_idx, missing_lines):
+		complete_data = data[outlier_features].iloc[complete_row_idx, :]
+		ilf = IsolationForest(n_estimators=min(100, len(complete_data)), n_jobs=-1, verbose=2)
+		ilf.fit(complete_data)
+		pred = ilf.predict(complete_data)
+		outlier_idx = [complete_row_idx[i] for i in np.where(pred == -1)[0]]
+		# put these outlier data into the missing list
+		for k, v in missing_lines.items():
+			missing_lines[k] = np.append(v, outlier_idx)
+		return ilf, missing_lines
+
+	def training_oulier_testdata(self, data, outlier_features):
+		ilf = IsolationForest(n_estimators=min(100, len(data)), n_jobs=-1, verbose=2)
+		ilf.fit(data[outlier_features])
+		return ilf
+
+	def training_oulier_alldata(self, data, t_data, outlier_features, complete_row_idx, missing_lines):
+		complete_data = data[outlier_features].iloc[complete_row_idx, :]
+		test_data = t_data[outlier_features]
+		all_data = pd.concat([complete_data, test_data], axis = 0, ignore_index=True)
+		ilf = IsolationForest(n_estimators=min(100, len(all_data)), n_jobs=-1, verbose=2)
+		ilf.fit(all_data)
+		if len(complete_data) > 0:
+			pred = ilf.predict(complete_data)
+			outlier_idx = [complete_row_idx[i] for i in np.where(pred == -1)[0]]
+			# put these outlier data into the missing list
+			for k, v in missing_lines.items():
+				missing_lines[k] = np.append(v, outlier_idx)
+		return ilf, missing_lines
+
+	def category2num(self, data, t_D):
+		num2Cat = {}
+		for x in data.columns:
+			if data[x].dtype != 'float' and data[x].dtype != 'int64':
+				num = preprocessing.LabelEncoder()
+				temp = pd.concat([data[x], t_D[x]], axis = 0)
+				num.fit(temp.astype(str))
+				data[x] = num.transform(data[x].astype(str))
+				t_D[x] = num.transform(t_D[x].astype(str))
+				num2Cat[x] = num
+				# data[x] = num.fit_transform(data[x])
+				# num2Cat[x] = dict(enumerate(num.classes_))
+		return data, t_D, num2Cat
+
+def complete_data_evaluate(test, nomiss_data, test_data):
+	c_test_data = copy.copy(test_data)
+	# c_data = copy.copy(data)
+	test.category2num(nomiss_data, c_test_data)
+	# test.category2num(c_data, c_test_data)
+	X_train = c_test_data.drop(data.columns[-1], axis = 1)
+	y_train = c_test_data.loc[:, data.columns[-1]]
+	p = test.evaluate(model, nomiss_data, X_train, y_train)
+	return p
 
 if __name__ == '__main__':
-	percent = 0.3
-	# folder = 'yeast'
-	folder = 'iris'
-	missing_file = 'missing' + str(percent) + '.csv'
-	test_file = 'test' + str(percent) + '.csv'
+	percent = 0.5
+	# name = 'wine'
+	name = 'iris'
+	# name = 'shuttle'
+	# name = 'yeast'
+	# name = 'adult'
+	folder = name + '/' + str(percent)
+
+
+	missing_file = 'missing' + '.csv'
+	test_file = 'test' + '.csv'
+	nomissing_file = 'nomissing' + '.csv'
+
 	warnings.filterwarnings(action='ignore', category=DeprecationWarning)
-	data = pd.read_csv(folder + '/' + missing_file, header = 0, index_col = 0).iloc[:, 1:]
-	test_data = pd.read_csv(folder + '/' + test_file, header = 0, index_col = 0).iloc[:, 1:]
-	# model = DecisionTreeClassifier()
-	model = RandomForestRegressor(random_state = 1)
+	data = pd.read_csv(folder + '/' + missing_file, header = 0, index_col = 0)
+	test_data = pd.read_csv(folder + '/' + test_file, header = 0, index_col = 0)
+	nomiss_data = pd.read_csv(folder + '/' + nomissing_file, header = 0, index_col = 0)
+	model = DecisionTreeClassifier(criterion = 'entropy')
+	# model = RandomForestRegressor(random_state = 1)
+
 	test = RF_Iter_Missing(model, 0.99)
-	new_data = test.RF_Missing_Iterative(data, test_data)
-	new_data.to_csv('recover_data.csv')
-	# l = [1, 3, 5, 6]
-	# test = BitVector(size = 10)
-	# test[0] = 1
-	# for i in l:
-	# 	test[i] = 1
-	# print(test)
-	# test.reset(val = 0)
-	# print(test)
+	# complete_data_evaluate(test_data)
+	p = complete_data_evaluate(test, nomiss_data, test_data)
+	print('no missing precision is {}'.format(p))
+	new_data = test.RF_Missing_Iterative(data, test_data, model)
+	# new_data = test.RF_Missing_Iterative(data, test_data, model, 1)
+
+	recover_file = 'recover_data.csv'
+	new_data.to_csv(folder + '/' + recover_file)
+
+
