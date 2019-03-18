@@ -8,8 +8,10 @@ import random
 from sklearn.tree import DecisionTreeClassifier
 import operator
 from sklearn.ensemble import IsolationForest
-from BitVector import BitVector
+from BitVector import BitVector  
 import copy
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_validate
 
 
 class RF_Iter_Missing(object):
@@ -119,7 +121,8 @@ class RF_Iter_Missing(object):
 		X_test = t_D.drop(t_D.columns[-1], axis = 1)
 		y_test = t_D.loc[:, t_D.columns[-1]]
 
-		accuracy = self.evaluate(model, data, X_test, y_test)
+		# accuracy = self.evaluate(model, data, X_test, y_test)
+		accuracy = self.self_evaluate(model, data).mean()
 		print('origional precision {}'.format(accuracy))
 
 		if predict_type == 1:
@@ -144,19 +147,27 @@ class RF_Iter_Missing(object):
 			count += 1
 			if count % 3 == 0:
 				data = self.outlier_fix(data, ilf, outlier_features, missing_lines, fill_data)
-			accuracy = self.evaluate(model, data, X_test, y_test)
+			# based on the test data
+			# accuracy = self.evaluate(model, data, X_test, y_test)
+
+			# here we can also ues it apply to the train data
+			accuracy = self.self_evaluate(model, data).mean()
+
 			# save the best fit result
-			if accuracy > best_precision:
-				print('update')
-				best_fit = post_predict
-				best_precision = accuracy
+			# if accuracy > best_precision:
+			# 	print('update')
+			# 	best_fit = post_predict
+			# 	best_precision = accuracy
+
+			best_fit = post_predict
+
 			p[(count-1)%3] = accuracy
 			print('Iteration {}, precision is {}'.format(count, accuracy))
 			# stop = operator.eq(post_predict, pre_predict) # too strict
 			loss = sum(abs(np.array(post_predict) - np.array(pre_predict)))/len(pre_predict) if len(pre_predict) != 0 else 10
 			print('current matrix change is {}'.format(loss))
 			# loop stop condition
-			if count > 30 or accuracy > self.precision or loss < 0.00001:
+			if count > 30 or loss < 0.00001:
 				break
 			if p[0] == p[1] and p[1] == p[2]:
 				break
@@ -191,6 +202,21 @@ class RF_Iter_Missing(object):
 		y_predict = model.predict(X_test)
 		accuracy = len(np.where(y_test == y_predict)[0])/len(y_test)
 		return accuracy
+
+	def self_evaluate(self, model, data):
+		''' test the result on the training model by cross validate
+
+		Parameters:
+		----------
+		model: machine learning model, models that will used in the latter prediction
+		data: Dataframe, dirty data set
+
+		Returns:
+		-------
+		score: mean of the precision over the 5 predictions
+		'''
+		scores = cross_validate(model, data.iloc[:, :-1], data.iloc[:, -1], cv=5)
+		return scores['test_score']
 
 	def fill_missing(self, data, not_missing_lines, predict_type):
 		""" fill all the missing data with mean or mode data, the global data are
@@ -253,6 +279,21 @@ class RF_Iter_Missing(object):
 		pass
 
 	def training_oulier_localdata(self, data, outlier_features, complete_row_idx, missing_lines):
+		''' Train for the outlier dection model, data comes from the dirty data
+
+		Parameters
+		----------
+		data: DataFrame, dirty data
+		outlier_features: list, columns on suspicion of having outlier data. From a different
+		persepct, their are colums that train for the outlier model
+		complete_row_idx: list, rows that are complete over the outlier_features
+		missing_lines: dict, {features:lines} which indicate all the lines that are missing on 
+		the specified features
+
+		Returns
+		ilf: IsolationForest, outlier dection model
+		missing_lines: dict, updated missing_lines
+		'''
 		complete_data = data[outlier_features].iloc[complete_row_idx, :]
 		ilf = IsolationForest(n_estimators=min(100, len(complete_data)), n_jobs=-1, verbose=2)
 		ilf.fit(complete_data)
@@ -264,11 +305,40 @@ class RF_Iter_Missing(object):
 		return ilf, missing_lines
 
 	def training_oulier_testdata(self, data, outlier_features):
+		''' Train for the outlier dection model, data comes from the test data
+
+		Parameters
+		----------
+		data: Dataframe, test data
+		outlier_features: list, columns on suspicion of having outlier data. From a different
+		persepct, their are colums that train for the outlier model
+
+		Returns
+		-------
+		ilf: IsolationForest, oulier dection model
+		'''
 		ilf = IsolationForest(n_estimators=min(100, len(data)), n_jobs=-1, verbose=2)
 		ilf.fit(data[outlier_features])
 		return ilf
 
 	def training_oulier_alldata(self, data, t_data, outlier_features, complete_row_idx, missing_lines):
+		''' Train for the outlier dection model, data comes from both dirty data and test data
+
+		Parameters
+		----------
+		data: Dataframe, dirty data
+		t_data: Dataframe, test data
+		outlier_features: list, columns on suspicion of having outlier data. From a different
+		persepct, their are colums that train for the outlier model
+		complete_row_idx: list, rows that are complete over the outlier_features
+		missing_lines: dict, {features:lines} which indicate all the lines that are missing on 
+		the specified features
+
+		Returns
+		ilf: IsolationForest, outlier dection model
+		missing_lines: dict, updated missing_lines
+
+		'''
 		complete_data = data[outlier_features].iloc[complete_row_idx, :]
 		test_data = t_data[outlier_features]
 		all_data = pd.concat([complete_data, test_data], axis = 0, ignore_index=True)
@@ -283,6 +353,19 @@ class RF_Iter_Missing(object):
 		return ilf, missing_lines
 
 	def category2num(self, data, t_D):
+		''' transform all the category attribute into the numeric ones
+
+		Parameters:
+		----------
+		data: Dataframe, input data, dirty data set
+		t_D: Dataframe, input data, test data set
+
+		Returns:
+		-------
+		data: Dataframe, revised dirty data set
+		t_D: Dataframe, revised test data set
+		num2Cat: dict, {attribute:labelEncoder}, a map which store all the transformation data
+		'''
 		num2Cat = {}
 		for x in data.columns:
 			if data[x].dtype != 'float' and data[x].dtype != 'int64':
@@ -307,7 +390,7 @@ def complete_data_evaluate(test, nomiss_data, test_data):
 	return p
 
 if __name__ == '__main__':
-	percent = 0.5
+	percent = 0.1
 	# name = 'wine'
 	name = 'iris'
 	# name = 'shuttle'
@@ -336,5 +419,3 @@ if __name__ == '__main__':
 
 	recover_file = 'recover_data.csv'
 	new_data.to_csv(folder + '/' + recover_file)
-
-

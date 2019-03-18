@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import re
 from sklearn import preprocessing
+from sklearn.model_selection import cross_validate
 
 def readFile(fname):
 	return pd.read_csv(fname, header = 0)
@@ -80,7 +81,7 @@ if __name__ == '__main__':
 	folder = 'iris'
 	# folder = 'shuttle'
 	# folder = 'wine'
-	percent = 0.5
+	percent = 0.1
 	F = folder + '/' + str(percent) + '/'
 	# fname = 'nomissing.csv'
 	fname = 'recover_data.csv'
