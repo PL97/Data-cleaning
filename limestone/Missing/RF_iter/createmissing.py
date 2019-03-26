@@ -105,17 +105,17 @@ if __name__ == '__main__':
 
 
 	percent = 0.5
-	folder_name = 'iris'
-	fname = 'iris.csv'
-	data = pd.read_csv(folder_name + '/' + fname, header = 0)
+	# folder_name = 'iris'
+	# fname = 'iris.csv'
+	# data = pd.read_csv(folder_name + '/' + fname, header = 0)
 
 	# folder_name = 'shuttle'
 	# fname = 'shuttle.txt'
 	# data = read_from_txt(folder_name + '/' + fname)
 
-	# folder_name = 'yeast'
-	# fname = 'yeast.txt'
-	# data = read_from_txt(folder_name + '/' + fname)
+	folder_name = 'yeast'
+	fname = 'yeast.txt'
+	data = read_from_txt(folder_name + '/' + fname)
 
 	# folder_name = 'adult'
 	# fname = 'adult.data.txt'

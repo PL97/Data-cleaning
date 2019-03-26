@@ -69,7 +69,7 @@ class RF_Iter_Missing(object):
 		return data, predict_y
 		# get the precision, recall and f1-measure of the result
 
-	def RF_Missing_Iterative(self, D, t_D, model, predict_type = 0):
+	def RF_Missing_Iterative(self, D, t_D, model, fix_fre, max_iter, predict_type = 0):
 		""" The method used in the a Iterative process for missing and outlier detection
 		and fix. 
 
@@ -122,8 +122,8 @@ class RF_Iter_Missing(object):
 		y_test = t_D.loc[:, t_D.columns[-1]]
 
 		# accuracy = self.evaluate(model, data, X_test, y_test)
-		accuracy = self.self_evaluate(model, data).mean()
-		print('origional precision {}'.format(accuracy))
+		p_fill = self.evaluate(model, data, X_test, y_test)
+		print('origional precision {}'.format(p_fill))
 
 		if predict_type == 1:
 			column_type[data.columns[-1]] = 'int'
@@ -136,6 +136,8 @@ class RF_Iter_Missing(object):
 		count = 0
 		best_fit = []
 		best_precision = 0
+		# save the precision for plot
+		p_all = []
 		while True:
 			pre_predict = []
 			for x in missing_count:
@@ -145,7 +147,7 @@ class RF_Iter_Missing(object):
 				data, prediction = self.RF(data, x, missing_lines[x], column_type[x])
 				post_predict.extend(prediction)
 			count += 1
-			if count % 3 == 0:
+			if count % fix_fre == 0:
 				data = self.outlier_fix(data, ilf, outlier_features, missing_lines, fill_data)
 			# based on the test data
 			# accuracy = self.evaluate(model, data, X_test, y_test)
@@ -163,11 +165,12 @@ class RF_Iter_Missing(object):
 
 			p[(count-1)%3] = accuracy
 			print('Iteration {}, precision is {}'.format(count, accuracy))
+			p_all.append(accuracy)
 			# stop = operator.eq(post_predict, pre_predict) # too strict
 			loss = sum(abs(np.array(post_predict) - np.array(pre_predict)))/len(pre_predict) if len(pre_predict) != 0 else 10
 			print('current matrix change is {}'.format(loss))
 			# loop stop condition
-			if count > 30 or loss < 0.00001:
+			if count > max_iter or loss < 0.001:
 				break
 			if p[0] == p[1] and p[1] == p[2]:
 				break
@@ -179,7 +182,7 @@ class RF_Iter_Missing(object):
 		# recover all numeric attributes to category attributes
 		for k, v in num2Cat.items():
 			data[k] = v.inverse_transform(data[k])
-		return data
+		return data, p_all, p_fill
 
 	def evaluate(self, model, data, X_test, y_test):
 		""" evaluate the performance of the cleaned data on the test data set with the
@@ -295,7 +298,7 @@ class RF_Iter_Missing(object):
 		missing_lines: dict, updated missing_lines
 		'''
 		complete_data = data[outlier_features].iloc[complete_row_idx, :]
-		ilf = IsolationForest(n_estimators=min(100, len(complete_data)), n_jobs=-1, verbose=2)
+		ilf = IsolationForest(n_estimators=min(100, len(complete_data)), n_jobs=-1, verbose=0)
 		ilf.fit(complete_data)
 		pred = ilf.predict(complete_data)
 		outlier_idx = [complete_row_idx[i] for i in np.where(pred == -1)[0]]
@@ -317,12 +320,12 @@ class RF_Iter_Missing(object):
 		-------
 		ilf: IsolationForest, oulier dection model
 		'''
-		ilf = IsolationForest(n_estimators=min(100, len(data)), n_jobs=-1, verbose=2)
+		ilf = IsolationForest(n_estimators=min(100, len(data)), n_jobs=-1, verbose=0)
 		ilf.fit(data[outlier_features])
 		return ilf
 
 	def training_oulier_alldata(self, data, t_data, outlier_features, complete_row_idx, missing_lines):
-		''' Train for the outlier dection model, data comes from both dirty data and test data
+		''' Train for the outlier dection model, data comes from both dirty data and test dat
 
 		Parameters
 		----------
@@ -342,7 +345,7 @@ class RF_Iter_Missing(object):
 		complete_data = data[outlier_features].iloc[complete_row_idx, :]
 		test_data = t_data[outlier_features]
 		all_data = pd.concat([complete_data, test_data], axis = 0, ignore_index=True)
-		ilf = IsolationForest(n_estimators=min(100, len(all_data)), n_jobs=-1, verbose=2)
+		ilf = IsolationForest(n_estimators=min(100, len(all_data)), n_jobs=-1, verbose=1)
 		ilf.fit(all_data)
 		if len(complete_data) > 0:
 			pred = ilf.predict(complete_data)
@@ -379,13 +382,13 @@ class RF_Iter_Missing(object):
 				# num2Cat[x] = dict(enumerate(num.classes_))
 		return data, t_D, num2Cat
 
-def complete_data_evaluate(test, nomiss_data, test_data):
+def complete_data_evaluate(model, test, nomiss_data, test_data):
 	c_test_data = copy.copy(test_data)
 	# c_data = copy.copy(data)
 	test.category2num(nomiss_data, c_test_data)
 	# test.category2num(c_data, c_test_data)
-	X_train = c_test_data.drop(data.columns[-1], axis = 1)
-	y_train = c_test_data.loc[:, data.columns[-1]]
+	X_train = c_test_data.drop(nomiss_data.columns[-1], axis = 1)
+	y_train = c_test_data.loc[:, nomiss_data.columns[-1]]
 	p = test.evaluate(model, nomiss_data, X_train, y_train)
 	return p
 
@@ -412,9 +415,9 @@ if __name__ == '__main__':
 
 	test = RF_Iter_Missing(model, 0.99)
 	# complete_data_evaluate(test_data)
-	p = complete_data_evaluate(test, nomiss_data, test_data)
+	p = complete_data_evaluate(model, test, nomiss_data, test_data)
 	print('no missing precision is {}'.format(p))
-	new_data = test.RF_Missing_Iterative(data, test_data, model)
+	new_data, p_all, p_fill = test.RF_Missing_Iterative(data, test_data, model, 3)
 	# new_data = test.RF_Missing_Iterative(data, test_data, model, 1)
 
 	recover_file = 'recover_data.csv'

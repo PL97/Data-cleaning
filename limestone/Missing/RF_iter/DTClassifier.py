@@ -13,7 +13,7 @@ def read_from_txt(fname):
 	data = np.loadtxt(fname, delimiter = '\s', dtype = 'str')
 	temp_data = []
 	for x in data:
-		temp_data.append(re.split(r'\s+', x))
+		temp_data.append(re.split(r'\s+', x))	
 	temp_data = np.array(temp_data)
 	test_txt_or_num = temp_data[0]
 	is_num = [i.replace(".", '', 1).isdigit() for i in test_txt_or_num]
@@ -48,10 +48,7 @@ def singleDataTest(fname):
 	accuracy = len(np.where(y_test == y_pred)[0])/len(y_test)
 	print(accuracy)
 
-def TranATest(trainFname, testFname):
-	train_data = pd.read_csv(trainFname, header = 0, index_col = 0)
-	test_data = pd.read_csv(testFname, header = 0, index_col = 0)
-
+def TranATest(train_data, test_data):
 	num = preprocessing.LabelEncoder()
 	for x in train_data.columns:
 		if train_data[x].dtype != 'float' and train_data[x].dtype != 'int64':
@@ -67,6 +64,7 @@ def TranATest(trainFname, testFname):
 	y_pred = model.predict(X_test)
 	accuracy = len(np.where(y_test == y_pred)[0])/len(y_test)
 	print(accuracy)
+	return accuracy
 
 
 
@@ -86,7 +84,9 @@ if __name__ == '__main__':
 	# fname = 'nomissing.csv'
 	fname = 'recover_data.csv'
 	fname1 = 'test.csv'
-	TranATest(F + fname, F + fname1)
+	train_data = pd.read_csv(F + fname, header = 0, index_col = 0)
+	test_data = pd.read_csv(F + fname1, header = 0, index_col = 0)
+	TranATest(train_data, test_data)
 
 
 
