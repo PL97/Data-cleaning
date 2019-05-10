@@ -9,11 +9,11 @@ import copy
 
 
 if __name__ == '__main__':
-	percent = 0.5
+	percent = 0.1
 	# name = 'wine'
-	# name = 'iris'
+	name = 'iris'
 	# name = 'shuttle'
-	name = 'yeast'
+	# name = 'yeast'
 	# name = 'adult'
 	folder = name + '/' + str(percent)
 
@@ -39,7 +39,7 @@ if __name__ == '__main__':
 		print('no missing precision is {}'.format(p))
 		temp_data = copy.deepcopy(data)
 		temp_test_data = pd.read_csv(folder + '/' + test_file, header = 0, index_col = 0)
-		new_data, p_all[i], p_fill[i]  = test.RF_Missing_Iterative(temp_data, temp_test_data, model, 3, 10)
+		new_data, p_all[i], p_fill[i]  = test.RF_Missing_Iterative(temp_data, temp_test_data, model, 3, max_iter = 10, max_diff = 0.001, predict_type = 1)
 		# new_data, p_all[i], p_fill[i]  = test.RF_Missing_Iterative(temp_data, temp_test_data, model, 4, 10, 1)
 		p_clean[i] = TranATest(new_data, temp_test_data)
 
@@ -47,6 +47,7 @@ if __name__ == '__main__':
 	colors = ['cyan', 'coral', 'orange', 'grey']
 	shapes = ['v', 'o', 'x']
 	plt.figure()
+	plt.title('K = {}'.format(percent))
 	plt.xlabel('iteration')
 	plt.ylabel('precision')
 	for i in range(test_times):

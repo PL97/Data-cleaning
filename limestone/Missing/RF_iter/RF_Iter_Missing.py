@@ -12,6 +12,7 @@ from BitVector import BitVector
 import copy
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_validate
+from ensemble_learning import *
 
 
 class RF_Iter_Missing(object):
@@ -69,7 +70,7 @@ class RF_Iter_Missing(object):
 		return data, predict_y
 		# get the precision, recall and f1-measure of the result
 
-	def RF_Missing_Iterative(self, D, t_D, model, fix_fre, max_iter, predict_type = 0):
+	def RF_Missing_Iterative(self, D, t_D, model, fix_fre, predict_type = 0, max_diff = 1e-3, max_iter = 30):
 		""" The method used in the a Iterative process for missing and outlier detection
 		and fix. 
 
@@ -87,7 +88,13 @@ class RF_Iter_Missing(object):
 		----------
 		D: DataFrame, data with missing values
 		D_t: DataFrame, data without missing values and uesd for cleaned data performance 
-		testing
+		model: sklearn model, model used for prediction normally a machine learning model
+		fix_fre: int, times for fixing the outlier data. e.g. fix_fre = 3 means after three times
+		learning, one outlier fixing must be performed
+		predict_type: int 0/1, the label type 0 means categorical type, 1 means numerical type
+		max_diff: float, filling matrix changes used in the stop criterion
+		max_iter: int, the max times of iteration of updating
+
 
 		Returns
 		-------
@@ -138,6 +145,7 @@ class RF_Iter_Missing(object):
 		best_precision = 0
 		# save the precision for plot
 		p_all = []
+		EL = ensembleLearning()
 		while True:
 			pre_predict = []
 			for x in missing_count:
@@ -149,6 +157,10 @@ class RF_Iter_Missing(object):
 			count += 1
 			if count % fix_fre == 0:
 				data = self.outlier_fix(data, ilf, outlier_features, missing_lines, fill_data)
+
+			# train for a sub classifier
+			EL.trainForSub(data.iloc[:, :-1], data.iloc[:, -1])
+
 			# based on the test data
 			# accuracy = self.evaluate(model, data, X_test, y_test)
 
@@ -170,10 +182,13 @@ class RF_Iter_Missing(object):
 			loss = sum(abs(np.array(post_predict) - np.array(pre_predict)))/len(pre_predict) if len(pre_predict) != 0 else 10
 			print('current matrix change is {}'.format(loss))
 			# loop stop condition
-			if count > max_iter or loss < 0.001:
+			if count > max_iter or loss < max_diff:
 				break
 			if p[0] == p[1] and p[1] == p[2]:
 				break
+		# save the ensemble classifier
+		self.ensemble_model = EL
+
 		# recover the data with the best fit
 		temp_count = 0
 		for x in missing_count:
@@ -361,7 +376,8 @@ class RF_Iter_Missing(object):
 		Parameters:
 		----------
 		data: Dataframe, input data, dirty data set
-		t_D: Dataframe, input data, test data set
+		t_D: Dataframe, input data
+		test data set
 
 		Returns:
 		-------
@@ -393,7 +409,7 @@ def complete_data_evaluate(model, test, nomiss_data, test_data):
 	return p
 
 if __name__ == '__main__':
-	percent = 0.1
+	percent = 0.3
 	# name = 'wine'
 	name = 'iris'
 	# name = 'shuttle'
@@ -419,6 +435,16 @@ if __name__ == '__main__':
 	print('no missing precision is {}'.format(p))
 	new_data, p_all, p_fill = test.RF_Missing_Iterative(data, test_data, model, 3)
 	# new_data = test.RF_Missing_Iterative(data, test_data, model, 1)
+
+	# bagging test
+	ensemble_result = test.ensemble_model.bagging(test_data.iloc[:, :-1])
+	accuracy = len(np.where(test_data.iloc[:, -1] == ensemble_result)[0])/test_data.shape[0]
+	print("ensemble learning(bagging) accuracy over the dataset: {}".format(accuracy))
+
+	#stacking test
+	ensemble_result = test.ensemble_model.stacking(new_data, test_data.iloc[:, :-1])
+	accuracy = len(np.where(test_data.iloc[:, -1] == ensemble_result)[0])/test_data.shape[0]
+	print("ensemble learning(stacking) accuracy over the dataset: {}".format(accuracy))
 
 	recover_file = 'recover_data.csv'
 	new_data.to_csv(folder + '/' + recover_file)
