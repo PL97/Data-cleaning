@@ -22,6 +22,22 @@ class RF_Iter_Missing(object):
 		self.precision = precision
 
 	def Preprocessing_Iterative(self, data):
+		""" get some information from the input data
+
+		Parameters:
+		-----------
+		data: DataFrame, input data from which we want get some infromation from
+
+		Returns:
+		--------
+		data: DataFrame, input data we donot revise it
+		missing: list, columns' name whihch has some missing values
+		missing_lines: dict, key: missing colums, value: lines with missing value
+		in the specific column
+		missing_count: dict, key: missing columns, value: the number of the missing count (sorted)
+		"""
+
+
 		# # prepare for the data
 		# data = pd.read_csv('missing0.3.csv', header = 0, index_col = 0)
 		missing = [x for x in data.columns if data[x].isnull().any()]
