@@ -9,11 +9,11 @@ import copy
 
 
 if __name__ == '__main__':
-	percent = 0.1
+	percent = 0.2
 	# name = 'wine'
-	name = 'iris'
+	# name = 'iris'
 	# name = 'shuttle'
-	# name = 'yeast'
+	name = 'yeast'
 	# name = 'adult'
 	folder = name + '/' + str(percent)
 
@@ -33,7 +33,7 @@ if __name__ == '__main__':
 	# complete_data_evaluate(test_data)
 	p = complete_data_evaluate(model, test, nomiss_data, test_data)
 
-	test_times = 3
+	test_times = 1
 	p_all = {}; p_fill = {}; p_clean = {}
 	for i in range(test_times):
 		print('no missing precision is {}'.format(p))
@@ -41,8 +41,8 @@ if __name__ == '__main__':
 		temp_test_data = pd.read_csv(folder + '/' + test_file, header = 0, index_col = 0)
 		new_data, p_all[i], p_fill[i]  = test.RF_Missing_Iterative(temp_data, temp_test_data, model, 3, max_iter = 10, max_diff = 0.001, predict_type = 1)
 		# new_data, p_all[i], p_fill[i]  = test.RF_Missing_Iterative(temp_data, temp_test_data, model, 4, 10, 1)
-		p_clean[i] = TranATest(new_data, temp_test_data)
-
+		test_new_data = copy.copy(new_data)
+		p_clean[i] = TranATest(test_new_data, temp_test_data)
 
 	colors = ['cyan', 'coral', 'orange', 'grey']
 	shapes = ['v', 'o', 'x']
@@ -54,4 +54,15 @@ if __name__ == '__main__':
 		plt.plot(p_all[i], c = colors[i])
 		plt.scatter(len(p_all[i]), p_clean[i], marker = shapes[i], c = 'green')
 		plt.scatter(0, p_fill[i], marker = shapes[i], c = 'red')
+
+	# ensemble_result = test.ensemble_model.bagging(test_data.iloc[:, :-1])
+	# accuracy = len(np.where(test_data.iloc[:, -1] == ensemble_result)[0])/test_data.shape[0]
+	# print("ensemble classifier: {}".format(accuracy))
+	# plt.plot(range(0, 10), [accuracy] * 10, c = "green")
+
+	# ensemble_result = test.ensemble_model.stacking(test_data.iloc[:, :-1])
+	# accuracy = len(np.where(test_data.iloc[:, -1] == ensemble_result)[0])/test_data.shape[0]
+	# print("ensemble classifier: {}".format(accuracy))
+	# plt.plot(range(0, 10), [accuracy] * 10, c = "red")
+
 	plt.show()

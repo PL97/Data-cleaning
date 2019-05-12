@@ -70,7 +70,7 @@ class RF_Iter_Missing(object):
 		return data, predict_y
 		# get the precision, recall and f1-measure of the result
 
-	def RF_Missing_Iterative(self, D, t_D, model, fix_fre, predict_type = 0, max_diff = 1e-3, max_iter = 30):
+	def RF_Missing_Iterative(self, D, t_D, model, fix_fre, predict_type = 0, max_diff = 1e-3, max_iter = 10):
 		""" The method used in the a Iterative process for missing and outlier detection
 		and fix. 
 
@@ -100,6 +100,10 @@ class RF_Iter_Missing(object):
 		-------
 		data: DataFrame, data which contains no missing values and has satified the specified 
 		classifying or clustering precision requirement.
+		p_all: list, the precision for the ensemble classifier
+		p_fill: float, the precision for the average/mode fill precision on the given model
+		num2Cat: dict, key: attribute value: transformer. A dict save all the transformer that
+		transform all the category attribute to the numeric one
 		"""
 		data, missing, missing_lines, missing_count = self.Preprocessing_Iterative(D)
 		# add some missing data artifically
@@ -158,8 +162,11 @@ class RF_Iter_Missing(object):
 			if count % fix_fre == 0:
 				data = self.outlier_fix(data, ilf, outlier_features, missing_lines, fill_data)
 
-			# train for a sub classifier
-			EL.trainForSub(data.iloc[:, :-1], data.iloc[:, -1])
+			# train for a sub classifier and use the origional type as label
+			if data.columns[-1] in num2Cat.keys():
+				EL.trainForSub(data.iloc[:, :-1], num2Cat[data.columns[-1]].inverse_transform(data.iloc[:, -1]))
+			else:
+				EL.trainForSub(data.iloc[:, :-1], data.iloc[:, -1])
 
 			# based on the test data
 			# accuracy = self.evaluate(model, data, X_test, y_test)
@@ -187,6 +194,10 @@ class RF_Iter_Missing(object):
 			if p[0] == p[1] and p[1] == p[2]:
 				break
 		# save the ensemble classifier
+		if data.columns[-1] in num2Cat.keys():
+			EL.intergrate(data.iloc[:, :-1], num2Cat[data.columns[-1]].inverse_transform(data.iloc[:, -1]))
+		else:
+			EL.intergrate(data.iloc[:, :-1], data.iloc[:, -1])
 		self.ensemble_model = EL
 
 		# recover the data with the best fit
@@ -396,6 +407,7 @@ class RF_Iter_Missing(object):
 				num2Cat[x] = num
 				# data[x] = num.fit_transform(data[x])
 				# num2Cat[x] = dict(enumerate(num.classes_))
+
 		return data, t_D, num2Cat
 
 def complete_data_evaluate(model, test, nomiss_data, test_data):
@@ -409,9 +421,9 @@ def complete_data_evaluate(model, test, nomiss_data, test_data):
 	return p
 
 if __name__ == '__main__':
-	percent = 0.3
-	# name = 'wine'
-	name = 'iris'
+	percent = 0.1
+	name = 'wine'
+	# name = 'iris'
 	# name = 'shuttle'
 	# name = 'yeast'
 	# name = 'adult'
@@ -433,7 +445,7 @@ if __name__ == '__main__':
 	# complete_data_evaluate(test_data)
 	p = complete_data_evaluate(model, test, nomiss_data, test_data)
 	print('no missing precision is {}'.format(p))
-	new_data, p_all, p_fill = test.RF_Missing_Iterative(data, test_data, model, 3)
+	new_data, p_all, p_fill = test.RF_Missing_Iterative(copy.deepcopy(data), copy.deepcopy(test_data), model, 3, 1)
 	# new_data = test.RF_Missing_Iterative(data, test_data, model, 1)
 
 	# bagging test
@@ -442,7 +454,7 @@ if __name__ == '__main__':
 	print("ensemble learning(bagging) accuracy over the dataset: {}".format(accuracy))
 
 	#stacking test
-	ensemble_result = test.ensemble_model.stacking(new_data, test_data.iloc[:, :-1])
+	ensemble_result = test.ensemble_model.stacking(test_data.iloc[:, :-1])
 	accuracy = len(np.where(test_data.iloc[:, -1] == ensemble_result)[0])/test_data.shape[0]
 	print("ensemble learning(stacking) accuracy over the dataset: {}".format(accuracy))
 

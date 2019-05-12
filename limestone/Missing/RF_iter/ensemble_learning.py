@@ -40,8 +40,8 @@ class ensembleLearning:
 		result = np.array(result).transpose()
 
 		model = DecisionTreeClassifier(criterion = 'entropy')
-		new_feature = category2num(pd.DataFrame(result[:, :-1]))[0]
-		new_label = np.array(result[:, -1])
+		new_feature = category2num(pd.DataFrame(result))[0]
+		new_label = np.array(label)
 		model.fit(new_feature, new_label)
 		self.sec_model = model	
 	
@@ -53,15 +53,15 @@ class ensembleLearning:
 		return result
 	
 	def bagging(self, feature):
-		models_result = self.predict(feature)
-		print(models_result.shape)
+		new_feature = category2num(feature)[0]
+		models_result = self.predict(new_feature)
 		result = [pd.Series.mode(x)[0] for x in models_result]
 		return result
 
 		
-	def stacking(self, train_data, feature):
-		self.intergrate(train_data.iloc[:, :-1], train_data.iloc[:, -1])
-		result = self.predict(feature)
-		new_feature = category2num(pd.DataFrame(result[:, :-1]))[0]
-		result = self.sec_model.predict(new_feature)   
+	def stacking(self, feature):
+		new_feature = category2num(feature)[0]
+		result = self.predict(new_feature)
+		new_feature = category2num(pd.DataFrame(result))[0]
+		result = self.sec_model.predict(new_feature)
 		return result
