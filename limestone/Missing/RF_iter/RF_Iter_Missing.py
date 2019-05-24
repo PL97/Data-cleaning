@@ -188,8 +188,8 @@ class RF_Iter_Missing(object):
 			# accuracy = self.evaluate(model, data, X_test, y_test)
 
 			# here we can also ues it apply to the train data
-			accuracy = self.self_evaluate(model, data).mean()
 
+			accuracy = self.self_evaluate(model, data).mean()
 			# save the best fit result
 			# if accuracy > best_precision:
 			# 	print('update')
@@ -438,8 +438,8 @@ def complete_data_evaluate(model, test, nomiss_data, test_data):
 
 if __name__ == '__main__':
 	percent = 0.1
-	name = 'wine'
-	# name = 'iris'
+	# name = 'wine'
+	name = 'iris'
 	# name = 'shuttle'
 	# name = 'yeast'
 	# name = 'adult'
