@@ -13,6 +13,7 @@ import copy
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_validate
 from ensemble_learning import *
+import sys
 
 
 class RF_Iter_Missing(object):
@@ -167,6 +168,8 @@ class RF_Iter_Missing(object):
 		p_all = []
 		EL = ensembleLearning()
 		while True:
+			# sys.stdout.flush()
+			# sys.stderr.flush()
 			pre_predict = []
 			for x in missing_count:
 				pre_predict.extend(list(data.loc[missing_lines[x], x]))
